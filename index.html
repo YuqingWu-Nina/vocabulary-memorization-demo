@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A swipe-based English vocabulary memorization demo for Chinese language learners."
+    />
+    <title>Word Loop — Vocabulary Practice</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #182033;
+        --muted: #667085;
+        --paper: #f5f7fb;
+        --card: #ffffff;
+        --blue: #3d5afe;
+        --blue-dark: #2944e5;
+        --green: #0d9a69;
+        --green-soft: #e4f8ef;
+        --red: #dd4b5a;
+        --red-soft: #ffe9ec;
+        --line: #e5e8f0;
+        --shadow: 0 20px 55px rgba(27, 39, 94, 0.14), 0 3px 12px rgba(27, 39, 94, 0.08);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        background:
+          radial-gradient(circle at 6% 5%, #d9e7ff 0, transparent 25rem),
+          radial-gradient(circle at 96% 96%, #dcf8ee 0, transparent 29rem),
+          var(--paper);
+      }
+
+      button { font: inherit; }
+
+      .app {
+        width: min(100%, 860px);
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: 28px 24px 36px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        font-weight: 800;
+        font-size: 1.08rem;
+        letter-spacing: -0.03em;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 35px;
+        height: 35px;
+        place-items: center;
+        color: white;
+        border-radius: 11px;
+        background: var(--blue);
+        box-shadow: 0 6px 13px rgba(61, 90, 254, 0.3);
+      }
+
+      .stats { display: flex; gap: 9px; }
+
+      .stat {
+        min-width: 79px;
+        padding: 8px 11px 7px;
+        text-align: center;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      .stat strong { display: block; font-size: 1.17rem; line-height: 1.1; }
+      .stat span { display: block; margin-top: 3px; color: var(--muted); font-size: 0.75rem; font-weight: 650; }
+      .stat.mastered strong { color: var(--green); }
+      .stat.retry strong { color: var(--red); }
+
+      main { display: grid; justify-items: center; padding-top: clamp(46px, 10vh, 92px); }
+
+      .eyebrow {
+        margin: 0 0 11px;
+        color: var(--blue);
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 2.5rem); letter-spacing: -0.055em; }
+      .instruction { margin: 10px 0 30px; color: var(--muted); font-size: 1rem; }
+
+      .deck {
+        position: relative;
+        width: min(100%, 500px);
+        height: 355px;
+        touch-action: pan-y;
+      }
+
+      .deck::before, .deck::after {
+        position: absolute;
+        inset: 9px 12px -9px;
+        z-index: -2;
+        content: "";
+        border: 1px solid #e5e9f5;
+        border-radius: 25px;
+        background: #edf1fb;
+      }
+
+      .deck::after { inset: 4px 6px -4px; z-index: -1; background: #f8f9fd; }
+
+      .card {
+        position: relative;
+        display: flex;
+        height: 100%;
+        flex-direction: column;
+        justify-content: center;
+        padding: 38px;
+        overflow: hidden;
+        cursor: grab;
+        user-select: none;
+        border: 1px solid var(--line);
+        border-radius: 25px;
+        background: var(--card);
+        box-shadow: var(--shadow);
+        transition: transform 0.25s ease, opacity 0.25s ease;
+        will-change: transform;
+      }
+
+      .card:active { cursor: grabbing; }
+      .card.is-dragging { transition: none; }
+      .card.fly-right { transform: translateX(130%) rotate(16deg); opacity: 0; }
+      .card.fly-left { transform: translateX(-130%) rotate(-16deg); opacity: 0; }
+
+      .answer-badge {
+        position: absolute;
+        top: 20px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+      }
+
+      .answer-badge.know { right: 20px; color: var(--green); background: var(--green-soft); transform: rotate(8deg); }
+      .answer-badge.retry { left: 20px; color: var(--red); background: var(--red-soft); transform: rotate(-8deg); }
+      .card.show-know .know, .card.show-retry .retry { opacity: 1; }
+
+      .word-label { color: var(--muted); font-size: 0.8rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+      .word { margin: 12px 0 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(3rem, 12vw, 5.6rem); font-weight: 700; letter-spacing: -0.06em; line-height: 0.95; }
+      .pronunciation { margin: 14px 0 0; color: var(--muted); font-size: 1rem; }
+
+      .details { display: none; margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--line); animation: reveal 0.28s ease both; }
+      .details.visible { display: block; }
+      .definition { margin: 0; font-size: 1.25rem; font-weight: 750; }
+      .example { margin: 10px 0 0; color: #465168; font-size: 1rem; font-style: italic; line-height: 1.55; }
+
+      @keyframes reveal { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+
+      .actions { display: grid; width: min(100%, 500px); grid-template-columns: 1fr 1fr; gap: 13px; margin-top: 31px; }
+
+      .action {
+        display: flex;
+        min-height: 56px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px;
+        cursor: pointer;
+        border: 1px solid;
+        border-radius: 16px;
+        font-weight: 800;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+      }
+
+      .action:hover { transform: translateY(-2px); box-shadow: 0 7px 16px rgba(27, 39, 94, 0.1); }
+      .action:focus-visible { outline: 3px solid rgba(61, 90, 254, 0.35); outline-offset: 3px; }
+      .forget { color: #c93647; border-color: #ffbec7; background: #fff5f6; }
+      .know { color: white; border-color: var(--blue); background: var(--blue); }
+      .know:hover { background: var(--blue-dark); }
+
+      .review-actions {
+        width: min(100%, 500px);
+        margin-top: 20px;
+        padding: 15px;
+        border: 1px solid #ccebdc;
+        border-radius: 17px;
+        background: #f4fcf7;
+      }
+      .review-actions p { margin: 0 0 12px; color: #35614d; font-size: 0.9rem; text-align: center; }
+      .review-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .review-buttons .action { min-height: 48px; border-radius: 12px; }
+      .continue { color: #21503c; border-color: #a7dfc2; background: white; }
+
+      .helper { margin: 20px 0 0; color: var(--muted); font-size: 0.88rem; text-align: center; }
+      kbd { padding: 2px 5px; color: #475569; border: 1px solid #d6dce8; border-bottom-width: 2px; border-radius: 5px; background: white; font-family: inherit; font-size: 0.76rem; }
+
+      .complete {
+        display: none;
+        width: min(100%, 500px);
+        min-height: 355px;
+        padding: 45px 36px;
+        text-align: center;
+        border: 1px solid #b8ead3;
+        border-radius: 25px;
+        background: linear-gradient(145deg, #f8fffb, #e7fbf0);
+        box-shadow: var(--shadow);
+      }
+      .complete.visible { display: grid; place-items: center; }
+      .complete-icon { display: grid; width: 66px; height: 66px; place-items: center; margin: 0 auto 18px; color: white; border-radius: 50%; background: var(--green); font-size: 2rem; }
+      .complete h2 { margin: 0; font-size: 2rem; letter-spacing: -0.05em; }
+      .complete p { margin: 12px 0 0; color: #3d5f51; line-height: 1.55; }
+      .restart { margin-top: 24px; padding: 11px 17px; cursor: pointer; color: white; border: 0; border-radius: 11px; background: var(--ink); font-weight: 750; }
+
+      @media (max-width: 540px) {
+        .app { padding: 20px 16px 28px; }
+        .topbar { gap: 12px; }
+        .brand { font-size: 1rem; }
+        .brand-mark { width: 31px; height: 31px; }
+        .stat { min-width: 61px; padding: 7px 7px; }
+        .stat span { font-size: 0.67rem; }
+        main { padding-top: 47px; }
+        .deck { height: 350px; }
+        .card { padding: 30px 25px; }
+        .word { font-size: clamp(3rem, 17vw, 4.4rem); }
+        .instruction { margin-bottom: 26px; font-size: 0.92rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">W</span> Word Loop</div>
+        <div class="stats" aria-label="Learning progress">
+          <div class="stat mastered"><strong id="mastered-count">0</strong><span>Mastered</span></div>
+          <div class="stat retry"><strong id="retry-count">0</strong><span>Not mastered</span></div>
+        </div>
+      </header>
+
+      <main>
+        <p class="eyebrow" id="progress-label">Word 1 of 6</p>
+        <h1>Do you know this word?</h1>
+        <p class="instruction">Swipe right if you know it, left if you need another try.</p>
+
+        <section class="deck" aria-live="polite" aria-label="Vocabulary flashcard">
+          <article class="card" id="card">
+            <span class="answer-badge retry">TRY AGAIN</span>
+            <span class="answer-badge know">I KNOW IT</span>
+            <span class="word-label">English word</span>
+            <div class="word" id="word"></div>
+            <p class="pronunciation" id="pronunciation"></p>
+            <div class="details" id="details">
+              <p class="definition" id="definition"></p>
+              <p class="example" id="example"></p>
+            </div>
+          </article>
+        </section>
+
+        <section class="complete" id="complete" aria-live="polite">
+          <div>
+            <div class="complete-icon" aria-hidden="true">✓</div>
+            <h2>Set complete!</h2>
+            <p>You’ve mastered every word in this set. Great work.</p>
+            <button class="restart" id="restart" type="button">Practice again</button>
+          </div>
+        </section>
+
+        <div class="actions" id="actions">
+          <button class="action forget" id="forget" type="button" aria-label="I do not remember this word">← I don’t remember</button>
+          <button class="action know" id="know" type="button" aria-label="I know this word">I know it →</button>
+        </div>
+        <section class="review-actions" id="mastery-review" hidden aria-live="polite">
+          <p>Check the answer. Need another try?</p>
+          <div class="review-buttons">
+            <button class="action forget" id="got-wrong" type="button">I got it wrong</button>
+            <button class="action continue" id="continue" type="button">Continue →</button>
+          </div>
+        </section>
+        <p class="helper" id="helper">You can also use <kbd>←</kbd> and <kbd>→</kbd>.</p>
+      </main>
+    </div>
+
+    <script>
+      const initialWords = [
+        { word: "serendipity", pronunciation: "/ˌserənˈdɪpəti/", definition: "意外发现美好事物的幸运", example: "Finding that little bookstore was pure serendipity." },
+        { word: "resilient", pronunciation: "/rɪˈzɪliənt/", definition: "有韧性的；能迅速恢复的", example: "Children can be remarkably resilient after a difficult change." },
+        { word: "vivid", pronunciation: "/ˈvɪvɪd/", definition: "生动的；鲜明的", example: "She gave a vivid description of the crowded night market." },
+        { word: "contemplate", pronunciation: "/ˈkɑːntəmpleɪt/", definition: "仔细考虑；沉思", example: "Take a moment to contemplate the choices before you." },
+        { word: "inevitable", pronunciation: "/ɪnˈevɪtəbəl/", definition: "不可避免的", example: "With enough practice, progress is inevitable." },
+        { word: "benevolent", pronunciation: "/bəˈnevələnt/", definition: "仁慈的；乐善好施的", example: "The benevolent neighbor shared her harvest with the village." }
+      ];
+
+      let queue = [];
+      let mastered = 0;
+      let notMastered = 0;
+      let isTransitioning = false;
+      let pointerStart = null;
+
+      const card = document.getElementById("card");
+      const wordEl = document.getElementById("word");
+      const pronunciationEl = document.getElementById("pronunciation");
+      const definitionEl = document.getElementById("definition");
+      const exampleEl = document.getElementById("example");
+      const details = document.getElementById("details");
+      const masteredCount = document.getElementById("mastered-count");
+      const retryCount = document.getElementById("retry-count");
+      const progressLabel = document.getElementById("progress-label");
+      const deck = document.querySelector(".deck");
+      const actions = document.getElementById("actions");
+      const masteryReview = document.getElementById("mastery-review");
+      const helper = document.getElementById("helper");
+      const complete = document.getElementById("complete");
+
+      function updateCounters() {
+        masteredCount.textContent = mastered;
+        retryCount.textContent = notMastered;
+      }
+
+      function render() {
+        const current = queue[0];
+        if (!current) {
+          deck.hidden = true;
+          actions.hidden = true;
+          masteryReview.hidden = true;
+          helper.hidden = true;
+          progressLabel.textContent = "All words mastered";
+          complete.classList.add("visible");
+          return;
+        }
+
+        wordEl.textContent = current.word;
+        pronunciationEl.textContent = current.pronunciation;
+        definitionEl.textContent = current.definition;
+        exampleEl.textContent = `“${current.example}”`;
+        details.classList.remove("visible");
+        card.classList.remove("show-know", "show-retry", "fly-right", "fly-left");
+        card.style.transform = "";
+        card.style.opacity = "";
+        actions.hidden = false;
+        masteryReview.hidden = true;
+        helper.hidden = false;
+        updateCounters();
+        progressLabel.textContent = `${queue.length} word${queue.length === 1 ? "" : "s"} left to master`;
+      }
+
+      function choose(known) {
+        if (isTransitioning || !queue.length) return;
+        isTransitioning = true;
+        details.classList.add("visible");
+        card.classList.add(known ? "show-know" : "show-retry");
+
+        if (known) {
+          mastered += 1;
+          updateCounters();
+          actions.hidden = true;
+          helper.hidden = true;
+          masteryReview.hidden = false;
+          return;
+        }
+
+        window.setTimeout(() => {
+          card.classList.add("fly-left");
+          window.setTimeout(() => {
+            const current = queue.shift();
+            notMastered += 1;
+            queue.push(current);
+            isTransitioning = false;
+            render();
+          }, 250);
+        }, 470);
+      }
+
+      function advanceMastered() {
+        if (!isTransitioning || !queue.length) return;
+        masteryReview.hidden = true;
+        card.classList.add("fly-right");
+        window.setTimeout(() => {
+          queue.shift();
+          isTransitioning = false;
+          render();
+        }, 250);
+      }
+
+      function correctMastery() {
+        if (!isTransitioning || !queue.length) return;
+        mastered -= 1;
+        notMastered += 1;
+        updateCounters();
+        masteryReview.hidden = true;
+        card.classList.remove("show-know");
+        card.classList.add("show-retry");
+        window.setTimeout(() => {
+          card.classList.add("fly-left");
+          window.setTimeout(() => {
+            queue.push(queue.shift());
+            isTransitioning = false;
+            render();
+          }, 250);
+        }, 260);
+      }
+
+      function reset() {
+        queue = initialWords.map(item => ({ ...item }));
+        mastered = 0;
+        notMastered = 0;
+        complete.classList.remove("visible");
+        deck.hidden = false;
+        actions.hidden = false;
+        masteryReview.hidden = true;
+        helper.hidden = false;
+        render();
+      }
+
+      document.getElementById("know").addEventListener("click", () => choose(true));
+      document.getElementById("forget").addEventListener("click", () => choose(false));
+      document.getElementById("continue").addEventListener("click", advanceMastered);
+      document.getElementById("got-wrong").addEventListener("click", correctMastery);
+      document.getElementById("restart").addEventListener("click", reset);
+
+      document.addEventListener("keydown", event => {
+        if (event.key === "ArrowRight") choose(true);
+        if (event.key === "ArrowLeft") choose(false);
+      });
+
+      card.addEventListener("pointerdown", event => {
+        if (isTransitioning) return;
+        pointerStart = { x: event.clientX, y: event.clientY };
+        card.setPointerCapture(event.pointerId);
+        card.classList.add("is-dragging");
+      });
+
+      card.addEventListener("pointermove", event => {
+        if (!pointerStart || isTransitioning) return;
+        const dx = event.clientX - pointerStart.x;
+        const rotation = dx / 22;
+        card.style.transform = `translateX(${dx}px) rotate(${rotation}deg)`;
+        card.classList.toggle("show-know", dx > 45);
+        card.classList.toggle("show-retry", dx < -45);
+      });
+
+      function endDrag(event) {
+        if (!pointerStart) return;
+        const dx = event.clientX - pointerStart.x;
+        pointerStart = null;
+        card.classList.remove("is-dragging", "show-know", "show-retry");
+        card.style.transform = "";
+        if (Math.abs(dx) > 90) choose(dx > 0);
+      }
+
+      card.addEventListener("pointerup", endDrag);
+      card.addEventListener("pointercancel", endDrag);
+      reset();
+    </script>
+  </body>
+</html>
